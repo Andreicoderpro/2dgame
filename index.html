@@ -1,81 +1,476 @@
-<script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-const TILE = 32;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Adventure Game</title>
+    <style>
+        body { text-align: center; background: #181c25; color: #fafaff; font-family: 'Segoe UI', Arial, sans-serif; }
+        canvas { background: #191b22; display: block; margin: auto; border: 3px solid #fff; box-shadow: 0 0 18px #0008; }
+        #quest { font-size: 1.2em; margin: 10px 0 20px 0; }
+    </style>
+</head>
+<body>
+    <h1 style="text-shadow: 0 2px 6px #000c, 0 6px 16px #3a5;">2D Adventure Game</h1>
+    <p id="quest">Quest: Find the Magic Key!</p>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
 
-// Place a spawner block (type 7) at [6][9]
-let worldGrid = [
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,3,0,0,0],
-    [0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,7,0,0,0,4,0,0,0,0,0], // <-- 7 is the spawner
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
 
-// ...keep houseGrid, inventory, player, etc. as before...
+        // Block size
+        const TILE = 32;
 
-// Add this function for the spawner block drawing
-function drawSpawnerBlock(x, y) {
-    ctx.save();
-    ctx.fillStyle = "#4a0";
-    ctx.fillRect(x, y, TILE, TILE);
-    ctx.strokeStyle = "#0f0";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x+4, y+4, TILE-8, TILE-8);
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 12px Segoe UI";
-    ctx.fillText("SPAWN", x + 2, y + 18);
-    ctx.restore();
-}
+        // World grid for "outside"
+        // 0: grass, 1: house, 2: door, 3: key, 4: enemy spawn, 5: custom placed
+        let worldGrid = [
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,3,0,0,0],
+            [0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        ];
 
-// Modify drawBlock to include the spawner
-function drawBlock(x, y, type) {
-    ctx.save();
-    if (map === "outside") {
-        if (type === 0) { /* ...grass... */ }
-        else if (type === 1) { /* ...house... */ }
-        else if (type === 2) { /* ...door... */ }
-        else if (type === 3) { drawKeyBlock(x, y); }
-        else if (type === 4) { /* ...enemy spawn... */ }
-        else if (type === 5) { drawCustomBlock(x, y); }
-        else if (type === 7) { drawSpawnerBlock(x, y); } // NEW!
-    } else {
-        // ...inside blocks...
-    }
-    ctx.restore();
-}
+        // World grid for "inside"
+        // 0: wood, 1: bed, 2: shop, 5: custom placed, 6: exit door
+        let houseGrid = [
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,1,1,0,0,0,0,2,2,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0], // 6 is exit door at col 14, row 5
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        ];
 
-// --- Monster Spawner Logic ---
-let enemies = [
-    { x: 13*TILE, y: 6*TILE, size: TILE, color: "#f55555", health: 3 }
-];
+        let map = "outside";
+        let inventory = ["Magic Key", "Block", "Dirt", "Stone", "Sand", "Wood", "Coal", "Iron", "Gold", "Emerald"];
+        let lastInteraction = "";
 
-// Every 4 seconds, spawn a monster at each spawner block
-setInterval(function() {
-    if (map !== "outside") return;
-    for (let row = 0; row < worldGrid.length; row++) {
-        for (let col = 0; col < worldGrid[row].length; col++) {
-            if (worldGrid[row][col] === 7) {
-                // Only spawn if less than N enemies (optional, to prevent too many)
-                if (enemies.length < 12) {
-                    // Spawn at spawner tile, slight random offset
-                    let ex = col * TILE + Math.floor(Math.random()*8-4);
-                    let ey = row * TILE + Math.floor(Math.random()*8-4);
-                    enemies.push({ x: ex, y: ey, size: TILE, color: "#f55555", health: 3 });
+        let player = { 
+            x: 2 * TILE, 
+            y: 2 * TILE, 
+            size: TILE, 
+            color: "#73d13d",
+            eyeOffset: [
+                {x: 10, y: 15}, // left eye
+                {x: 22, y: 15}  // right eye
+            ]
+        };
+
+        let mouse = {x: player.x + player.size / 2, y: player.y + player.size / 2};
+
+        let enemies = [{ x: 13*TILE, y: 6*TILE, size: TILE, color: "#f55555", health: 3 }];
+
+        function drawBlock(x, y, type) {
+            ctx.save();
+            if (map === "outside") {
+                if (type === 0) { // grass
+                    ctx.fillStyle = "#7ec850";
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.strokeStyle = "#5a9a34";
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, TILE, TILE);
+                } else if (type === 1) { // house
+                    ctx.fillStyle = "#b97a57";
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = "#ba9650";
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + TILE/2, y - TILE/2);
+                    ctx.lineTo(x + TILE, y);
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (type === 2) { // door
+                    ctx.fillStyle = "#9b7b52";
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = "#e5d186";
+                    ctx.beginPath();
+                    ctx.arc(x + TILE - 8, y + TILE/2, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                } else if (type === 3) { // key
+                    drawKeyBlock(x, y);
+                } else if (type === 4) { // enemy spawn
+                    ctx.fillStyle = "#bb0000";
+                    ctx.globalAlpha = 0.2;
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.globalAlpha = 1;
+                } else if (type === 5) { // custom block
+                    drawCustomBlock(x, y);
+                }
+            } else {
+                if (type === 0) { // wood floor
+                    ctx.fillStyle = "#e0c088";
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.strokeStyle = "#b89d60";
+                    ctx.strokeRect(x, y, TILE, TILE);
+                } else if (type === 1) { // bed
+                    drawBedBlock(x, y);
+                } else if (type === 2) { // shop
+                    drawShopBlock(x, y);
+                } else if (type === 5) { // custom placed
+                    drawCustomBlock(x, y);
+                } else if (type === 6) { // exit door
+                    ctx.fillStyle = "#9b7b52";
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = "#e5d186";
+                    ctx.beginPath();
+                    ctx.arc(x + TILE - 8, y + TILE/2, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                    // Draw little arrow to indicate exit
+                    ctx.strokeStyle = "#fff";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x + 8, y + TILE/2 - 5);
+                    ctx.lineTo(x + 18, y + TILE/2);
+                    ctx.lineTo(x + 8, y + TILE/2 + 5);
+                    ctx.stroke();
                 }
             }
+            ctx.restore();
         }
-    }
-}, 4000);
 
-// ...rest of your script including drawGame, moveEnemies, controls, etc...
+        function drawKeyBlock(x, y) {
+            ctx.save();
+            ctx.fillStyle = "#ffe066";
+            ctx.fillRect(x, y, TILE, TILE);
+            ctx.fillStyle = "#e5b400";
+            ctx.fillRect(x + 14, y + 6, 4, 20);
+            ctx.fillRect(x + 20, y + 16, 6, 4);
+            ctx.fillRect(x + 4, y + 12, 12, 8);
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(x + 6, y + 14, 4, 4);
+            ctx.restore();
+        }
 
-</script>
+        function drawBedBlock(x, y) {
+            ctx.save();
+            ctx.fillStyle = "#6379fb";
+            ctx.fillRect(x, y, TILE, TILE);
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(x+4, y+4, 24, 10);
+            ctx.restore();
+        }
+
+        function drawShopBlock(x, y) {
+            ctx.save();
+            ctx.fillStyle = "#b44ad2";
+            ctx.fillRect(x, y, TILE, TILE);
+            ctx.fillStyle = "#f9e24f";
+            ctx.font = "bold 12px Segoe UI";
+            ctx.fillText("SHOP", x+3, y+18);
+            ctx.restore();
+        }
+
+        function drawCustomBlock(x, y) {
+            ctx.save();
+            ctx.fillStyle = "#444";
+            ctx.fillRect(x, y, TILE, TILE);
+            ctx.strokeStyle = "#222";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, TILE, TILE);
+            ctx.restore();
+        }
+
+        function drawPlayer(x, y, size) {
+            ctx.save();
+            ctx.fillStyle = "#73d13d";
+            ctx.fillRect(x, y, size, size);
+            ctx.strokeStyle = "#366f19";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, size, size);
+            ctx.fillStyle = "#c1e49b";
+            ctx.fillRect(x + 6, y + 7, size-12, size-16);
+            for (let i=0; i<2; ++i) {
+                let eyex = x + player.eyeOffset[i].x;
+                let eyey = y + player.eyeOffset[i].y;
+                let centerX = x + size/2, centerY = y + size/2;
+                let dx = mouse.x - centerX;
+                let dy = mouse.y - centerY;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                let maxOffset = 3;
+                let ex = eyex + (dist > 0 ? dx/dist * maxOffset : 0);
+                let ey = eyey + (dist > 0 ? dy/dist * maxOffset : 0);
+                ctx.fillStyle = "#222";
+                ctx.fillRect(ex, ey, 4, 4);
+            }
+            ctx.fillStyle = "#222";
+            ctx.fillRect(x + 12, y + 22, 8, 2);
+            ctx.restore();
+        }
+
+        function drawEnemy(enemy) {
+            let {x, y, size} = enemy;
+            ctx.save();
+            ctx.fillStyle = "#f55555";
+            ctx.fillRect(x, y, size, size);
+            ctx.strokeStyle = "#a11";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, size, size);
+            ctx.fillStyle = "#222";
+            ctx.fillRect(x + 8, y + 11, 6, 6);
+            ctx.fillRect(x + size - 14, y + 11, 6, 6);
+            ctx.fillRect(x + 10, y + 24, 12, 3);
+            ctx.fillStyle = "#333";
+            ctx.fillRect(x, y - 8, size, 5);
+            ctx.fillStyle = "#0f0";
+            ctx.fillRect(x, y - 8, size * (enemy.health/3), 5);
+            ctx.restore();
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let grid = map === "outside" ? worldGrid : houseGrid;
+            for (let row = 0; row < grid.length; row++) {
+                for (let col = 0; col < grid[row].length; col++) {
+                    drawBlock(col * TILE, row * TILE, grid[row][col]);
+                }
+            }
+            if (map === "outside") {
+                enemies.forEach(enemy => drawEnemy(enemy));
+            }
+            drawPlayer(player.x, player.y, player.size);
+            ctx.save();
+            ctx.globalAlpha = 0.77;
+            ctx.fillStyle = "#1a1a22";
+            ctx.fillRect(0, 0, canvas.width, 35);
+            ctx.globalAlpha = 1;
+            ctx.font = "16px Segoe UI";
+            ctx.fillStyle = "#fff";
+            ctx.shadowColor = "#000b";
+            ctx.shadowBlur = 6;
+            ctx.fillText(
+                "Inventory: " + 
+                inventory.map((item, i) => `[${i+1}] ${item}`).join(", "), 
+                18, 24
+            );
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        }
+
+        function moveEnemies() {
+            enemies.forEach(enemy => {
+                let dx = player.x - enemy.x, dy = player.y - enemy.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > 1) {
+                    enemy.x += Math.round(dx / dist * 1.5);
+                    enemy.y += Math.round(dy / dist * 1.2);
+                }
+            });
+        }
+
+        function attackEnemy() {
+            enemies.forEach((enemy, index) => {
+                let dx = player.x - enemy.x, dy = player.y - enemy.y;
+                if (Math.abs(dx) < TILE && Math.abs(dy) < TILE) {
+                    enemy.health -= 1;
+                    if (enemy.health <= 0) {
+                        enemies.splice(index, 1);
+                        alert("You defeated the enemy!");
+                    }
+                }
+            });
+        }
+
+        function playerOnBlock(type) {
+            let grid = map === "outside" ? worldGrid : houseGrid;
+            let col = Math.floor((player.x + player.size/2) / TILE);
+            let row = Math.floor((player.y + player.size/2) / TILE);
+            return grid[row] && grid[row][col] === type;
+        }
+
+        // Mouse tracking for eyes
+        canvas.addEventListener("mousemove", function(e) {
+            let rect = canvas.getBoundingClientRect();
+            mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        });
+
+        // Place item on mouse click
+        canvas.addEventListener("mousedown", function(e) {
+            if (inventory.length === 0) return;
+            let rect = canvas.getBoundingClientRect();
+            let mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+            let my = (e.clientY - rect.top) * (canvas.height / rect.height);
+            let col = Math.floor(mx / TILE);
+            let row = Math.floor(my / TILE);
+            let grid = map === "outside" ? worldGrid : houseGrid;
+            if (map === "outside" && grid[row] && grid[row][col] === 0) {
+                grid[row][col] = 5;
+                inventory.shift();
+            } else if (map !== "outside" && grid[row] && grid[row][col] === 0) {
+                grid[row][col] = 5;
+                inventory.shift();
+            }
+            drawGame();
+        });
+
+        // Mining with 'm' under mouse
+        document.addEventListener("keydown", (event) => {
+            let move = TILE;
+            let oldX = player.x, oldY = player.y;
+            if (event.key === "ArrowUp" || event.key === "w") player.y -= move;
+            if (event.key === "ArrowDown" || event.key === "s") player.y += move;
+            if (event.key === "ArrowLeft" || event.key === "a") player.x -= move;
+            if (event.key === "ArrowRight" || event.key === "d") player.x += move;
+            if (event.key === " " || event.key === "Spacebar") attackEnemy();
+
+            // Place item at random location on number key
+            if (/^[1-9]$/.test(event.key) && inventory.length > 0) {
+                let n = parseInt(event.key, 10);
+                let grid = map === "outside" ? worldGrid : houseGrid;
+                for (let i = 0; i < n; i++) {
+                    let x = Math.floor(Math.random() * grid[0].length);
+                    let y = Math.floor(Math.random() * grid.length);
+                    if (map === "outside" && grid[y][x] === 0) {
+                        grid[y][x] = 5;
+                        inventory.shift();
+                        break;
+                    } else if (map !== "outside" && grid[y][x] === 0) {
+                        grid[y][x] = 5;
+                        inventory.shift();
+                        break;
+                    }
+                }
+                drawGame();
+            }
+
+            // Swap inventory items if user types: let x = [1-9] y = [1-9] (and x != y)
+            let swapMatch = event.key.match(/^([1-9])$/);
+            if (swapMatch) {
+                if (window.swapStep === undefined) window.swapStep = {};
+                if (!window.swapStep.x) {
+                    window.swapStep.x = parseInt(swapMatch[1], 10) - 1;
+                } else if (!window.swapStep.y) {
+                    window.swapStep.y = parseInt(swapMatch[1], 10) - 1;
+                    let x = window.swapStep.x, y = window.swapStep.y;
+                    if (x !== y && x < inventory.length && y < inventory.length) {
+                        let temp = inventory[x];
+                        inventory[x] = inventory[y];
+                        inventory[y] = temp;
+                    }
+                    window.swapStep = {};
+                    drawGame();
+                }
+            }
+
+            if (event.key === "Enter" && window.swapCommand) {
+                let m = window.swapCommand.match(/let\s+x\s*=\s*(\d+)\s*y\s*=\s*(\d+)/i);
+                if (m) {
+                    let x = parseInt(m[1], 10) - 1;
+                    let y = parseInt(m[2], 10) - 1;
+                    if (x !== y && x >= 0 && y >= 0 && x < inventory.length && y < inventory.length) {
+                        let temp = inventory[x];
+                        inventory[x] = inventory[y];
+                        inventory[y] = temp;
+                    }
+                }
+                window.swapCommand = "";
+                drawGame();
+            } else if (event.key.length === 1) {
+                window.swapCommand = (window.swapCommand || "") + event.key;
+            }
+
+            // Mining under mouse
+            if (event.key.toLowerCase() === "m") {
+                let grid = map === "outside" ? worldGrid : houseGrid;
+                let mx = mouse.x, my = mouse.y;
+                let col = Math.floor(mx / TILE);
+                let row = Math.floor(my / TILE);
+                if (col >= 0 && col < grid[0].length && row >= 0 && row < grid.length) {
+                    let blockType = grid[row][col];
+                    if (blockType !== 0 && blockType !== undefined) {
+                        if (blockType === 3) {
+                            inventory.push("Magic Key");
+                        } else if (blockType === 1) {
+                            inventory.push("House");
+                        } else if (blockType === 2) {
+                            inventory.push("Door");
+                        } else if (blockType === 5) {
+                            inventory.push("Custom Block");
+                        } else if (blockType === 6) {
+                            inventory.push("Door");
+                        } else if (blockType === 4) {
+                            // Enemy spawn, don't add
+                        }
+                        grid[row][col] = 0;
+                    }
+                }
+                drawGame();
+            }
+
+            let grid = map === "outside" ? worldGrid : houseGrid;
+            let maxRow = grid.length, maxCol = grid[0].length;
+            let col = Math.floor((player.x + player.size/2) / TILE);
+            let row = Math.floor((player.y + player.size/2) / TILE);
+            if (col < 0 || col >= maxCol || row < 0 || row >= maxRow) {
+                player.x = oldX;
+                player.y = oldY;
+            }
+
+            // Interactions
+            if (map === "outside") {
+                if (playerOnBlock(2) && lastInteraction !== "door") {
+                    map = "inside";
+                    player.x = 3 * TILE;
+                    player.y = 3 * TILE;
+                    lastInteraction = "door";
+                }
+                if (playerOnBlock(3) && lastInteraction !== "key") {
+                    inventory.push("Magic Key");
+                    document.getElementById("quest").innerText = "Quest Completed!";
+                    grid[row][col] = 0;
+                    lastInteraction = "key";
+                }
+            } else {
+                if (playerOnBlock(1) && lastInteraction !== "bed") {
+                    alert("You rested in the bed.");
+                    lastInteraction = "bed";
+                }
+                if (playerOnBlock(2) && lastInteraction !== "shop") {
+                    alert("Welcome to the shop! (Coming soon)");
+                    lastInteraction = "shop";
+                }
+                // Exit door interaction
+                if (playerOnBlock(6) && lastInteraction !== "exit") {
+                    // Place player just outside the house door
+                    map = "outside";
+                    // Find the outside door location
+                    for (let y = 0; y < worldGrid.length; y++) {
+                        for (let x = 0; x < worldGrid[0].length; x++) {
+                            if (worldGrid[y][x] === 2) {
+                                player.x = x * TILE;
+                                player.y = y * TILE;
+                            }
+                        }
+                    }
+                    lastInteraction = "exit";
+                }
+            }
+            if (!(playerOnBlock(2)||playerOnBlock(3)||playerOnBlock(1)||playerOnBlock(6))) {
+                lastInteraction = "";
+            }
+
+            if (map === "outside") moveEnemies();
+            drawGame();
+        });
+
+        function animate() {
+            drawGame();
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>
